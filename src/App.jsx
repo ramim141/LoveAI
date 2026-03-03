@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useRef } from 'react';
 import { 
   Heart, Sparkles, Copy, RefreshCw, Send, Star, User, Zap, 
   Gift, BrainCircuit, ChevronRight, CheckCircle2, Calendar, 
@@ -54,6 +54,33 @@ const App = () => {
     { id: 'explosive', label: 'পারমাণবিক!', emoji: '☢️' }
   ];
 
+  const createLocalFallback = () => {
+    const today = new Date().toLocaleDateString('bn-BD', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric'
+    });
+
+    const receiverWord = senderType === 'boyfriend' ? 'রাজকন্যা' : 'রাজকুমার';
+    const moodLine = {
+      cute: 'আজকের অভিমানটা এতই মিষ্টি যে আমি রাগ না, আদর করতেই চাই।',
+      mild: 'তোমার একটু রাগ মানেই আমার দিনটা অর্ধেক অন্ধকার।',
+      moderate: 'আমার ভুলগুলো আমি বুঝেছি, এবার শুধু তোমার হাসিটা চাই।',
+      silent: 'তোমার চুপ থাকা আমার জন্য সবচেয়ে কঠিন শাস্তি।',
+      cold: 'তোমার এই ঠান্ডা দূরত্ব গলাতে আমি মন দিয়ে চেষ্টা করছি।',
+      extreme: 'রাগ যত বড়ই হোক, তোমাকে হারানোর ভয়টা তার থেকেও বড়।',
+      explosive: 'আজ পরিস্থিতি বিস্ফোরক, কিন্তু আমার ভালোবাসা তার থেকেও শক্তিশালী।'
+    };
+
+    const letter = `*তারিখ:* ${today}\n*বিষয়:* অভিমান ভাঙানোর জরুরি আবেদন 💌\n\nপ্রিয় ${name},\n\nআমার প্রিয় ${receiverWord},\n${moodLine[angerLevel] || moodLine.moderate}\n\nতোমার ওপর রাগ করা আমার কাজ না, তোমাকে ভালো রাখা আমার দায়িত্ব। আমি যদি কোথাও তোমাকে কষ্ট দিয়ে থাকি, সত্যি করে *দুঃখিত*। আজকে থেকে আমি কথা কম, যত্ন বেশি দেখাবো।\n\nতুমি আমার জীবনের সবচেয়ে সুন্দর অভ্যাস। তোমার হাসি ফেরানো পর্যন্ত আমি চেষ্টা চালিয়ে যাবো—চা নিয়ে, গল্প নিয়ে, আর অনেক *ভালোবাসা* নিয়ে।\n\nএকটা সুযোগ দাও, নতুন করে শুরু করি? 🌸`; 
+
+    const rhyme = `রাগ কোরো না, মনটা দাও, 💖\nভুল যে হলে, মাফটা চাও। 🙏\nতোমার হাসি চাই যে খুব, 😊\nফিরে এসো, প্রিয়তম রূপ। 🌼`;
+
+    const gift = 'একটা হাতে লেখা ছোট নোট, সাথে প্রিয় স্ন্যাক্স আর একটি গোলাপ দিন। 🌹';
+
+    return { letter, rhyme, gift };
+  };
+
   const resolveModelsToTry = async () => {
     const baseModels = [...new Set(candidateModels.filter(Boolean))];
     const now = Date.now();
@@ -104,7 +131,7 @@ const App = () => {
           body: JSON.stringify({
             contents: [{ parts: [{ text: prompt }] }],
             generationConfig: {
-              maxOutputTokens: 512,
+              maxOutputTokens: 1024,
               temperature: 0.7
             }
           })
@@ -244,9 +271,17 @@ const App = () => {
       const rhymeMatch = sanitizedResult.match(/RHYME:([\s\S]*?)GIFT:/);
       const giftMatch = sanitizedResult.match(/GIFT:([\s\S]*)/);
 
-      setGeneratedText(letterMatch ? letterMatch[1].trim() : sanitizedResult);
-      setShortRhyme(rhymeMatch ? rhymeMatch[1].trim() : "");
-      setGiftIdea(giftMatch ? giftMatch[1].trim() : "");
+      const parsedLetter = letterMatch ? letterMatch[1].trim() : sanitizedResult.trim();
+      const parsedRhyme = rhymeMatch ? rhymeMatch[1].trim() : "";
+      const parsedGift = giftMatch ? giftMatch[1].trim() : "";
+
+      if (parsedLetter.replace(/\s+/g, ' ').length < 140) {
+        throw new Error('অসম্পূর্ণ উত্তর পাওয়া গেছে');
+      }
+
+      setGeneratedText(parsedLetter);
+      setShortRhyme(parsedRhyme);
+      setGiftIdea(parsedGift);
       
       setTimeout(() => {
         if (resultRef.current) {
@@ -254,13 +289,18 @@ const App = () => {
         }
       }, 100);
     } catch (err) {
+      const fallback = createLocalFallback();
+      setGeneratedText(fallback.letter);
+      setShortRhyme(fallback.rhyme);
+      setGiftIdea(fallback.gift);
+
       const message = err?.message?.includes('VITE_GEMINI_API_KEY')
-        ? 'API key পাওয়া যায়নি। .env ফাইলে VITE_GEMINI_API_KEY সেট করুন।'
+        ? 'API key পাওয়া যায়নি। তাই লোকাল টেমপ্লেট দিয়ে চিঠি তৈরি করা হয়েছে।'
         : err?.message?.includes('quota') || err?.message?.includes('429')
-        ? 'Gemini free limit hit করেছে। ১-৫ মিনিট পরে আবার চেষ্টা করুন, না হলে অন্য API key দিন।'
-        : "AI সার্ভারে একটু সমস্যা হচ্ছে। আবার চেষ্টা করুন। 🥺";
+        ? 'Gemini limit hit করেছে। তাই আপাতত লোকাল টেমপ্লেট দিয়ে চিঠি তৈরি করা হয়েছে।'
+        : 'AI response অসম্পূর্ণ ছিল, তাই লোকাল টেমপ্লেট দিয়ে পূর্ণ চিঠি তৈরি করা হয়েছে।';
       setError(message);
-      setTimeout(() => setError(null), 4000);
+      setTimeout(() => setError(null), 5000);
     } finally {
       setLoading(false);
     }
@@ -277,7 +317,6 @@ const App = () => {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const themeColor = senderType === 'boyfriend' ? 'rose' : 'indigo';
   const bgGradient = senderType === 'boyfriend' 
     ? 'from-rose-50 to-pink-50' 
     : 'from-indigo-50 to-blue-50';
